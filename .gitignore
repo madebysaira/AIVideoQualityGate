@@ -1,0 +1,9 @@
+# Generated reports and local media
+reports/
+*.mp4
+*.mov
+*.mkv
+*.wav
+__pycache__/
+*.pyc
+.pytest_cache/
