@@ -53,8 +53,14 @@ def _video_duration_s(metadata):
     for stream in metadata.get("streams", []):
         if stream.get("codec_type") != "video":
             continue
+        # cover art (attached_pic) is a still image, not the main video:
+        # its 1-frame duration would truncate reconstruction badly.
+        if stream.get("disposition", {}).get("attached_pic") == 1:
+            continue
         frames = stream.get("nb_frames")
-        rate = stream.get("r_frame_rate") or stream.get("avg_frame_rate")
+        # avg_frame_rate is the true average; r_frame_rate is nominal/codec
+        # rate and can diverge badly on VFR or telecined content.
+        rate = stream.get("avg_frame_rate") or stream.get("r_frame_rate")
         if frames is not None and rate and rate not in ("0/0", "N/A"):
             try:
                 num, _, den = rate.partition("/")
@@ -89,6 +95,11 @@ def optional_filters(path, metadata=None):
     result = _run(["ffmpeg", "-hide_banner", "-nostats", "-i", path,
                    "-vf", "blackdetect=d=0.5:pic_th=0.98,freezedetect=n=0.003:d=1",
                    "-af", "ebur128=framelog=verbose", "-f", "null", "-"])
+    if result.returncode != 0:
+        # partial/failed decode must not be read as EOF freezes: an
+        # interrupted run can leave an unmatched freeze_start even though
+        # the file continues past the decode failure.
+        return {"available": False, "reason": f"ffmpeg exited {result.returncode}"}
     text = (result.stderr or "")
     black = _timestamps(text, r"black_start:\s*([0-9.]+).*?black_end:\s*([0-9.]+)")
     freeze = _timestamps(text, r"freeze_start:\s*([0-9.]+).*?freeze_end:\s*([0-9.]+)")
