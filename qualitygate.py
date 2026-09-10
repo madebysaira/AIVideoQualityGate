@@ -39,7 +39,7 @@ def main(argv=None):
             metadata = probe(name)
             findings = inspect_metadata(metadata, profile)
             if not args.no_filters:
-                apply_filter_findings(findings, optional_filters(name))
+                apply_filter_findings(findings, optional_filters(name, metadata))
             result = summarize(name, findings)
         except ProbeError as exc:
             result = {"file": str(name), "status": "error", "error": str(exc), "findings": []}
